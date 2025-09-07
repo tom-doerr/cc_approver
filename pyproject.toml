@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "cc_approver"
+version = "0.4.1"
+description = "DSPy-only permission hook + optimizer for Claude Code (PreToolUse), with MIPROv2/GEPA, TUI, and project/global models."
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+license = "MIT"
+packages = [{ include = "cc_approver" }]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+dspy-ai = ">=2.4.0"
+litellm = ">=1.35.0"
+questionary = ">=2.0.1"
+
+[tool.poetry.dev-dependencies]
+pytest = ">=7.4.0"
+pytest-cov = ">=4.1.0"
+pytest-mock = ">=3.11.0"
+pytest-asyncio = ">=0.21.0"
+
+[tool.poetry.scripts]
+cc-approver = "cc_approver.cli:main"
+cc-approver-hook = "cc_approver.hook:main"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"

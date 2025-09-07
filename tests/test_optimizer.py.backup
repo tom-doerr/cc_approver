@@ -1,0 +1,51 @@
+import pytest
+from unittest.mock import Mock, patch, MagicMock
+from pathlib import Path
+import json
+
+from cc_approver.optimizer import (
+    load_train_data, prepare_trainset,
+    run_training, save_compiled_model
+)
+
+class TestLoadTrainData:
+    def test_load_train_data_success(self, temp_dir):
+        """Test successful loading of training data."""
+        # Create test JSONL file
+        train_file = temp_dir / "train.jsonl"
+        data = [
+            {"tool_name": "Bash", "tool_input_json": '{"command": "ls"}', "label": "allow"},
+            {"tool_name": "Edit", "tool_input_json": '{"path": "test.py"}', "label": "deny"}
+        ]
+        with open(train_file, 'w') as f:
+            for item in data:
+                f.write(json.dumps(item) + '\n')
+        
+        result = load_train_data(str(train_file))
+        assert len(result) == 2
+        assert result[0]["tool_name"] == "Bash"
+        assert result[1]["label"] == "deny"
+    
+    def test_load_train_data_file_not_found(self):
+        """Test loading with non-existent file."""
+        result = load_train_data("/nonexistent/path.jsonl")
+        assert result == []
+    
+    def test_load_train_data_invalid_json(self, temp_dir):
+        """Test loading with invalid JSON."""
+        train_file = temp_dir / "invalid.jsonl"
+        train_file.write_text("not valid json\n{}")
+        
+        result = load_train_data(str(train_file))
+        assert len(result) == 1  # Only valid line parsed
+
+class TestPrepareTrainset:
+    @patch('cc_approver.optimizer.dspy.Example')
+    def test_prepare_trainset(self, mock_example):
+        """Test trainset preparation."""
+        mock_example.side_effect = lambda **kwargs: kwargs
+        
+        data = [
+            {"tool_name": "Bash", "tool_input_json": '{"command": "ls"}', "label": "allow"},
+            {"tool_name": "Edit", "tool_input_json": '{"path": "test.py"}', "label": "deny"}
+        ]

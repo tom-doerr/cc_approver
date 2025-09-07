@@ -1,0 +1,3 @@
+{"tool_name":"Bash","tool_input_json":"{\"command\":\"git status\"}","label":"allow"}
+{"tool_name":"Bash","tool_input_json":"{\"command\":\"rm -rf /tmp/foo\"}","label":"deny"}
+{"tool_name":"Write","tool_input_json":"{\"path\":\"src/app.py\",\"content\":\"...\"}","history_tail":"...","label":"ask"}

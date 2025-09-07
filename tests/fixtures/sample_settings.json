@@ -1,0 +1,13 @@
+{
+  "policy": {
+    "approverInstructions": "Deny destructive operations; allow read-only operations and tests."
+  },
+  "dspyApprover": {
+    "model": "openrouter/google/gemini-2.5-flash-lite",
+    "historyBytes": 0,
+    "compiledModelPath": "$CLAUDE_PROJECT_DIR/.claude/models/approver.compiled.json"
+  },
+  "hooks": {
+    "PreToolUse": []
+  }
+}
