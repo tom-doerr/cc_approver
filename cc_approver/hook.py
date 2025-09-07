@@ -10,6 +10,7 @@ from .validators import normalize_decision, truncate_reason
 logger = logging.getLogger(__name__)
 
 def main() -> None:
+    verbose = os.environ.get("CC_APPROVER_VERBOSE", "").lower() == "true"
     try: 
         payload: Dict[str, Any] = json.load(sys.stdin)
     except (json.JSONDecodeError, IOError) as e:
@@ -18,10 +19,20 @@ def main() -> None:
     tool: str = payload.get("tool_name","") or ""
     tinput: Dict[str, Any] = payload.get("tool_input",{}) or {}
     tpath: str = payload.get("transcript_path","") or ""
+    
+    if verbose:
+        print(f"VERBOSE: Tool={tool}", file=sys.stderr)
+        print(f"VERBOSE: Input={json.dumps(tinput)[:500]}", file=sys.stderr)
+        print(f"VERBOSE: Project={os.environ.get('CLAUDE_PROJECT_DIR', 'not set')}", file=sys.stderr)
 
     proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
-    settings, _ = load_settings_chain(proj)
+    settings, settings_path = load_settings_chain(proj)
     cfg = get_dspy_config(settings, proj)
+    
+    if verbose:
+        print(f"VERBOSE: Settings loaded from: {settings_path}", file=sys.stderr)
+        print(f"VERBOSE: Policy: {get_policy_text(settings)[:200]}...", file=sys.stderr)
+        print(f"VERBOSE: Model: {cfg['model']}", file=sys.stderr)
 
     configure_lm(cfg["model"], temperature=DEFAULT_TEMPERATURE, max_tokens=DEFAULT_MAX_TOKENS)
     candidates = [cfg["compiledModelPath"],

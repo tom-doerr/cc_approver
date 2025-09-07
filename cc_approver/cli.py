@@ -2,18 +2,12 @@ from __future__ import annotations
 import argparse, json, os, sys, logging
 from pathlib import Path
 from typing import Optional, Dict, Any
-from .approver import ApproverProgram, configure_lm, try_load_compiled, run_program
 from .settings import (
     load_settings_chain, write_settings, ensure_policy_text, ensure_dspy_config,
     merge_pretooluse_hook, get_policy_text, get_dspy_config
 )
 from .optimizer import optimize_from_files
 from . import tui
-from .constants import (
-    DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, VALID_DECISIONS,
-    DEFAULT_DECISION, MAX_REASON_LENGTH, HOOK_EVENT_NAME
-)
-from .validators import normalize_decision, truncate_reason
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +46,7 @@ def main() -> None:
 
     p = sub.add_parser("hook", help="Run the PreToolUse hook")
     p.add_argument("--history-bytes", type=int, help="Override settings historyBytes")
+    p.add_argument("--verbose", action="store_true", help="Show verbose debug output")
     p.set_defaults(func=cmd_hook)
 
     args = ap.parse_args()
@@ -136,40 +131,11 @@ def _run_optimize(scope, optimizer, auto, task_model, prompt_model, reflection_m
     print(f"Dev accuracy: {acc:.3f}")
 
 def cmd_hook(args: argparse.Namespace) -> None:
-    try: 
-        payload: Dict[str, Any] = json.load(sys.stdin)
-    except (json.JSONDecodeError, IOError) as e:
-        logger.debug(f"Failed to parse JSON from stdin: {e}")
-        payload = {}
-    tool: str = payload.get("tool_name","") or ""
-    tinput: Dict[str, Any] = payload.get("tool_input",{}) or {}
-    tpath: str = payload.get("transcript_path","") or ""
+    # Set verbose flag if provided
+    if getattr(args, "verbose", False):
+        os.environ["CC_APPROVER_VERBOSE"] = "true"
+    
+    # Call the hook main function
+    from . import hook
+    hook.main()
 
-    proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
-    settings, _ = load_settings_chain(proj)
-    cfg = get_dspy_config(settings, proj)
-    configure_lm(cfg["model"], temperature=DEFAULT_TEMPERATURE, max_tokens=DEFAULT_MAX_TOKENS)
-
-    candidates = [cfg["compiledModelPath"],
-                  str(Path(proj)/".claude/models/approver.compiled.json"),
-                  str(Path.home()/".claude/models/approver.compiled.json")]
-    program = try_load_compiled(candidates) or ApproverProgram()
-
-    history_bytes = args.history_bytes if getattr(args, "history_bytes", None) is not None else cfg["historyBytes"]
-    history = tail(tpath, history_bytes)
-    res = run_program(program, get_policy_text(settings), tool, tinput, history)
-
-    decision = normalize_decision(res.decision)
-    reason = truncate_reason(res.reason)
-    print(json.dumps({"hookSpecificOutput":{
-        "hookEventName":HOOK_EVENT_NAME,"permissionDecision":decision,"permissionDecisionReason":reason}}))
-
-def tail(path: str, n: int) -> str:
-    if not path or not isinstance(n, int) or n <= 0: return ""
-    try:
-        with open(path, "rb") as f:
-            f.seek(0,2); sz=f.tell(); f.seek(max(0, sz-n))
-            return f.read().decode("utf-8","ignore")[-n:]
-    except (FileNotFoundError, IOError) as e:
-        logger.debug(f"Failed to read file tail: {e}")
-        return ""
