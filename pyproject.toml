@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cc_approver"
-version = "0.4.1"
+version = "0.5.0"
 description = "DSPy-only permission hook + optimizer for Claude Code (PreToolUse), with MIPROv2/GEPA, TUI, and project/global models."
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"

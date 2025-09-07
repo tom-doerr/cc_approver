@@ -30,11 +30,60 @@ def settings_paths(project_dir: Optional[str] = None) -> Tuple[Path, Path, Path]
             Path.home()/".claude"/"settings.json")
 
 def load_settings_chain(project_dir: Optional[str] = None) -> Tuple[Dict[str, Any], Path]:
+    """Legacy function - loads first found settings file (no merging)."""
     for p in settings_paths(project_dir):
         d = _read_json(p)
         if isinstance(d, dict): return d, p
     _, project_path, _ = settings_paths(project_dir)
     return {}, project_path
+
+def load_and_merge_settings(project_dir: Optional[str] = None) -> Tuple[Dict[str, Any], Path]:
+    """Load and merge settings from global → project → local."""
+    local_path, project_path, global_path = settings_paths(project_dir)
+    
+    # Load all settings files
+    global_settings = _read_json(global_path) or {}
+    project_settings = _read_json(project_path) or {}
+    local_settings = _read_json(local_path) or {}
+    
+    # Start with global as base
+    merged = global_settings.copy()
+    
+    # Special handling for policy to preserve global/local distinction
+    global_policy = global_settings.get("policy", {}).get("approverInstructions", "")
+    
+    # Merge project settings
+    _deep_merge(merged, project_settings)
+    
+    # Merge local settings
+    _deep_merge(merged, local_settings)
+    
+    # Store global policy separately for merging logic
+    if global_policy and "policy" in merged:
+        merged["policy"]["globalInstructions"] = global_policy
+        
+        # If local has approverInstructions, treat it as localInstructions
+        local_policy = local_settings.get("policy", {}).get("approverInstructions", "")
+        if local_policy:
+            merged["policy"]["localInstructions"] = local_policy
+    
+    # Determine which path to return (first existing)
+    if local_settings:
+        return merged, local_path
+    elif project_settings:
+        return merged, project_path
+    elif global_settings:
+        return merged, global_path
+    else:
+        return {}, project_path
+
+def _deep_merge(base: dict, override: dict) -> None:
+    """Deep merge override into base dict (modifies base in-place)."""
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
 
 def ensure_policy_text(settings: dict, default_text: str = "") -> dict:
     pol = settings.setdefault("policy", {})
@@ -74,9 +123,46 @@ def merge_pretooluse_hook(settings: dict, *, command: str,
     return settings
 
 def get_policy_text(settings: dict) -> str:
+    """Get simple policy text (legacy)."""
     pol = settings.get("policy") or {}
     t = pol.get("approverInstructions")
     return t if isinstance(t, str) else ""
+
+def get_merged_policy(settings: dict) -> str:
+    """Get merged policy text with intelligent combining of global and local rules."""
+    pol = settings.get("policy") or {}
+    
+    # Get base instructions
+    global_instructions = pol.get("globalInstructions", "")
+    local_instructions = pol.get("localInstructions", "")
+    legacy_instructions = pol.get("approverInstructions", "")
+    
+    # Handle merge strategy
+    merge_strategy = pol.get("mergeStrategy", "append")  # append, replace, prepend
+    
+    if merge_strategy == "replace":
+        # Local completely replaces global
+        return local_instructions or legacy_instructions or global_instructions
+    elif merge_strategy == "prepend":
+        # Local rules come first (higher priority)
+        parts = []
+        if local_instructions:
+            parts.append(f"LOCAL RULES (HIGHEST PRIORITY): {local_instructions}")
+        if global_instructions:
+            parts.append(f"GLOBAL RULES: {global_instructions}")
+        if not parts and legacy_instructions:
+            parts.append(legacy_instructions)
+        return " ".join(parts)
+    else:  # append (default)
+        # Global rules come first, local adds to them
+        parts = []
+        if global_instructions:
+            parts.append(f"GLOBAL RULES: {global_instructions}")
+        if local_instructions:
+            parts.append(f"PROJECT-SPECIFIC RULES: {local_instructions}")
+        if not parts and legacy_instructions:
+            parts.append(legacy_instructions)
+        return " ".join(parts)
 
 def _resolve(s: str, project_dir: Optional[str]) -> str:
     root = project_dir or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()

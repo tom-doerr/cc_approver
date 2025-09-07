@@ -3,7 +3,7 @@ import json, os, sys, logging
 from pathlib import Path
 from typing import Dict, Any
 from .approver import ApproverProgram, configure_lm, try_load_compiled, run_program
-from .settings import load_settings_chain, get_dspy_config, get_policy_text
+from .settings import load_and_merge_settings, get_dspy_config, get_merged_policy
 from .constants import DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, HOOK_EVENT_NAME
 from .validators import normalize_decision, truncate_reason
 
@@ -26,12 +26,12 @@ def main() -> None:
         print(f"VERBOSE: Project={os.environ.get('CLAUDE_PROJECT_DIR', 'not set')}", file=sys.stderr)
 
     proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
-    settings, settings_path = load_settings_chain(proj)
+    settings, settings_path = load_and_merge_settings(proj)
     cfg = get_dspy_config(settings, proj)
     
     if verbose:
         print(f"VERBOSE: Settings loaded from: {settings_path}", file=sys.stderr)
-        print(f"VERBOSE: Policy: {get_policy_text(settings)[:200]}...", file=sys.stderr)
+        print(f"VERBOSE: Policy: {get_merged_policy(settings)[:200]}...", file=sys.stderr)
         print(f"VERBOSE: Model: {cfg['model']}", file=sys.stderr)
 
     configure_lm(cfg["model"], temperature=DEFAULT_TEMPERATURE, max_tokens=DEFAULT_MAX_TOKENS)
@@ -40,7 +40,7 @@ def main() -> None:
                   str(Path.home()/".claude/models/approver.compiled.json")]
     program = try_load_compiled(candidates) or ApproverProgram()
 
-    policy = get_policy_text(settings)
+    policy = get_merged_policy(settings)
     history = tail(tpath, cfg["historyBytes"])
     res = run_program(program, policy, tool, tinput, history)
 

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "dspyApprover": {
+    "model": "openrouter/google/gemini-2.5-flash",
+    "historyBytes": 0,
+    "compiledModelPath": "$CLAUDE_PROJECT_DIR/.claude/models/approver.compiled.json",
+    "optimizer": "mipro",
+    "auto": "light"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cc-approver hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
