@@ -8,15 +8,17 @@ from .constants import DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS
 logger = logging.getLogger(__name__)
 
 class Approver(dspy.Signature):
-    """Decide permission for a tool use.
-    Inputs: policy, tool, tool_input_json, history_tail (optional).
-    Outputs: decision ∈ {allow, deny, ask}, reason (short)."""
-    policy = dspy.InputField()
-    tool = dspy.InputField()
-    tool_input_json = dspy.InputField()
-    history_tail = dspy.InputField(optional=True)
-    decision = dspy.OutputField(desc="allow|deny|ask")
-    reason = dspy.OutputField()
+    """Decide permission for a tool use based on the provided policy.
+    
+    IMPORTANT: Your decision MUST follow the policy instructions.
+    Analyze the tool and its input against the policy to determine permission.
+    The policy defines what should be allowed, denied, or require confirmation."""
+    policy = dspy.InputField(desc="Security policy that MUST guide your decision")
+    tool = dspy.InputField(desc="Name of the tool being invoked")
+    tool_input_json = dspy.InputField(desc="JSON string of tool parameters")
+    history_tail = dspy.InputField(desc="Recent conversation history", optional=True)
+    decision = dspy.OutputField(desc="allow|deny|ask - MUST align with policy")
+    reason = dspy.OutputField(desc="Brief explanation referencing the policy")
 
 class ApproverProgram(dspy.Module):
     def __init__(self) -> None:
@@ -32,6 +34,7 @@ def configure_lm(model: str, temperature: float = DEFAULT_TEMPERATURE,
                  max_tokens: int = DEFAULT_MAX_TOKENS) -> None:
     """Configure global DSPy LM (LiteLLM handles provider keys)."""
     dspy.configure(lm=dspy.LM(model, temperature=temperature, max_tokens=max_tokens))
+
 
 def try_load_compiled(paths: List[Union[str, Path]]) -> Optional[ApproverProgram]:
     """Load first existing compiled program."""

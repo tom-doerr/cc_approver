@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, json, os, sys, shutil, logging
+import argparse, json, os, sys, logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 from .approver import ApproverProgram, configure_lm, try_load_compiled, run_program
@@ -33,7 +33,6 @@ def main() -> None:
     p.add_argument("--reflection-model")
     p.add_argument("--matcher")
     p.add_argument("--timeout", type=int)
-    p.add_argument("--standalone", action="store_true")
     p.add_argument("--policy-text")
     p.set_defaults(func=cmd_init_or_tui)
 
@@ -69,7 +68,7 @@ def cmd_init_or_tui(args: argparse.Namespace) -> None:
                        ["scope","model","history_bytes","matcher","timeout","policy_text"])
     sel = tui.init_menu() if need_tui else {
         "scope": args.scope, "model": args.model, "history_bytes": args.history_bytes,
-        "standalone": args.standalone, "matcher": args.matcher, "timeout": args.timeout,
+        "matcher": args.matcher, "timeout": args.timeout,
         "policy_text": args.policy_text
     }
     sel["prompt_model"] = getattr(args, "prompt_model", None)
@@ -77,21 +76,13 @@ def cmd_init_or_tui(args: argparse.Namespace) -> None:
     sel["reflection_model"] = getattr(args, "reflection_model", None)
     _run_init(**sel)
 
-def _run_init(scope, model, history_bytes, standalone, matcher, timeout, policy_text,
+def _run_init(scope, model, history_bytes, matcher, timeout, policy_text,
               prompt_model=None, eval_model=None, reflection_model=None):
     proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     settings, path = load_settings_chain(proj)
     compiled_path = ("$CLAUDE_PROJECT_DIR/.claude/models/approver.compiled.json"
                      if scope == "project" else str(Path.home()/".claude/models/approver.compiled.json"))
     command = "cc-approver hook"
-    if standalone:
-        src = Path(__file__).with_name("hook_template.py")
-        dst = Path(proj)/".claude"/"hooks"/"cc_approver_hook.py"
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-        # Make the hook executable
-        dst.chmod(0o755)
-        command = "$CLAUDE_PROJECT_DIR/.claude/hooks/cc_approver_hook.py"
     settings = ensure_policy_text(settings, policy_text)
     settings = ensure_dspy_config(settings, model=model, history_bytes=history_bytes,
                                   compiled_path=compiled_path, optimizer="mipro", auto="light",
@@ -100,7 +91,6 @@ def _run_init(scope, model, history_bytes, standalone, matcher, timeout, policy_
     settings = merge_pretooluse_hook(settings, command=command, matcher=matcher, timeout=timeout)
     write_settings(settings, path)
     print(f"Initialized settings at {path}")
-    if standalone: print(f"Hook written to {dst}")
 
 def cmd_optimize_or_tui(args: argparse.Namespace) -> None:
     need_tui = not getattr(args, "train", None)

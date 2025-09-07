@@ -20,7 +20,6 @@ def init_menu():
     scope = q.select("Scope?", choices=["project","global"], default=detect_scope_default()).ask()
     model = q.select("Task model?", choices=GEMINI_CHOICES, default=GEMINI_CHOICES[0]).ask()
     history = q.text("History bytes (0 = disabled):", default="0").ask()
-    standalone = q.confirm("Copy physical hook file into .claude/hooks/?", default=True).ask()
     matcher = q.text("Matcher (regex of tools):", default="Bash|Edit|Write").ask()
     timeout = q.text("Hook timeout (seconds):", default="10").ask()
     policy = q.text("Policy text (approverInstructions):",
@@ -29,7 +28,6 @@ def init_menu():
         "scope": scope,
         "model": model,
         "history_bytes": int(history or "0"),
-        "standalone": bool(standalone),
         "matcher": matcher or "Bash|Edit|Write",
         "timeout": int(timeout or "10"),
         "policy_text": policy or "",
