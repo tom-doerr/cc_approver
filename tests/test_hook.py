@@ -24,7 +24,7 @@ class TestTail:
         assert tail("/any/path", 0) == ""
 
 class TestMain:
-    @patch('cc_approver.hook.load_settings_chain')
+    @patch('cc_approver.hook.load_and_merge_settings')
     def test_main_handles_empty_stdin(self, mock_load):
         """Test main handles empty stdin gracefully."""
         with patch('sys.stdin') as mock_stdin:
@@ -37,7 +37,7 @@ class TestMain:
     @patch('cc_approver.hook.configure_lm')
     @patch('cc_approver.hook.get_policy_text')
     @patch('cc_approver.hook.get_dspy_config')
-    @patch('cc_approver.hook.load_settings_chain')
+    @patch('cc_approver.hook.load_and_merge_settings')
     def test_main_with_valid_json(self, mock_load, mock_dspy_cfg, 
                                   mock_policy, mock_configure, 
                                   mock_load_compiled, mock_run):

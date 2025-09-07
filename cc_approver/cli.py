@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from .settings import (
     load_settings_chain, write_settings, ensure_policy_text, ensure_dspy_config,
-    merge_pretooluse_hook, get_policy_text, get_dspy_config
+    merge_pretooluse_hook, get_policy_text, get_dspy_config, _read_json
 )
 from .optimizer import optimize_from_files
 from . import tui
@@ -74,7 +74,15 @@ def cmd_init_or_tui(args: argparse.Namespace) -> None:
 def _run_init(scope, model, history_bytes, matcher, timeout, policy_text,
               prompt_model=None, eval_model=None, reflection_model=None):
     proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
-    settings, path = load_settings_chain(proj)
+    
+    # Determine target path based on scope
+    if scope == "global":
+        path = Path.home() / ".claude" / "settings.json"
+        settings = _read_json(path) or {}
+    else:  # project scope
+        path = Path(proj) / ".claude" / "settings.json"
+        settings = _read_json(path) or {}
+    
     compiled_path = ("$CLAUDE_PROJECT_DIR/.claude/models/approver.compiled.json"
                      if scope == "project" else str(Path.home()/".claude/models/approver.compiled.json"))
     command = "cc-approver hook"

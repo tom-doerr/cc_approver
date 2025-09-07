@@ -4,9 +4,10 @@ import argparse
 import sys
 
 from cc_approver.cli import (
-    main, tail, _tui_entry, cmd_init_or_tui, 
+    main, _tui_entry, cmd_init_or_tui, 
     cmd_optimize_or_tui, cmd_hook, _run_init
 )
+from cc_approver.hook import tail
 
 class TestTailFunction:
     def test_tail_empty_path(self):
@@ -80,26 +81,21 @@ class TestRunInit:
     @patch('cc_approver.cli.merge_pretooluse_hook')
     @patch('cc_approver.cli.ensure_dspy_config')
     @patch('cc_approver.cli.ensure_policy_text')
-    @patch('cc_approver.cli.load_settings_chain')
-    @patch('shutil.copy2')
-    @patch('pathlib.Path.chmod')
-    def test_run_init_project_scope(self, mock_chmod, mock_copy, mock_load, 
+    @patch('cc_approver.cli._read_json')
+    def test_run_init_project_scope(self, mock_load, 
                                    mock_ensure_policy, mock_ensure_dspy, 
                                    mock_merge, mock_write):
         """Test _run_init with project scope."""
         from cc_approver.cli import _run_init
-        mock_load.return_value = ({}, Mock())
+        mock_load.return_value = {}
         
-        _run_init('project', 'model', 100, True, 'Bash', 10, 'Policy')
+        _run_init('project', 'model', 100, 'Bash', 10, 'Policy')
         
         mock_load.assert_called_once()
         mock_ensure_policy.assert_called_once()
         mock_ensure_dspy.assert_called_once()
         mock_merge.assert_called_once()
         mock_write.assert_called_once()
-        # Verify hook is copied and made executable
-        mock_copy.assert_called_once()
-        mock_chmod.assert_called_once_with(0o755)
 
 class TestCmdHook:
     def test_cmd_hook(self, capsys):
