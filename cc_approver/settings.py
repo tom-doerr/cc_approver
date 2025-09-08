@@ -87,7 +87,10 @@ def _deep_merge(base: dict, override: dict) -> None:
 
 def ensure_policy_text(settings: dict, default_text: str = "") -> dict:
     pol = settings.setdefault("policy", {})
-    if not isinstance(pol.get("approverInstructions"), str):
+    # Always update if new text provided, otherwise only set if missing
+    if default_text:
+        pol["approverInstructions"] = default_text
+    elif not isinstance(pol.get("approverInstructions"), str):
         pol["approverInstructions"] = default_text
     return settings
 
@@ -99,11 +102,12 @@ def ensure_dspy_config(settings: dict, *,
                        eval_model: str | None = None,
                        reflection_model: str | None = None):
     cfg = settings.setdefault("dspyApprover", {})
-    cfg.setdefault("model", model)
-    cfg.setdefault("historyBytes", history_bytes)
-    cfg.setdefault("compiledModelPath", compiled_path)
-    cfg.setdefault("optimizer", optimizer)
-    cfg.setdefault("auto", auto)
+    # Always update with new values provided
+    cfg["model"] = model
+    cfg["historyBytes"] = history_bytes
+    cfg["compiledModelPath"] = compiled_path
+    cfg["optimizer"] = optimizer
+    cfg["auto"] = auto
     if prompt_model is not None: cfg["promptModel"] = prompt_model
     if eval_model is not None: cfg["evalModel"] = eval_model
     if reflection_model is not None: cfg["reflectionModel"] = reflection_model
