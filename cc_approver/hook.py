@@ -47,7 +47,7 @@ def main() -> None:
     res = run_program(program, policy, tool, tinput, history)
 
     decision = normalize_decision(res.decision)
-    reason = truncate_reason(res.reason)
+    reason = truncate_reason(getattr(res, "reason", ""))
 
     print(json.dumps({"hookSpecificOutput":{
         "hookEventName":HOOK_EVENT_NAME,
