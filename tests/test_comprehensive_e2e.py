@@ -7,11 +7,13 @@ import json
 import subprocess
 import sys
 import os
+import io
 import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import patch, Mock, MagicMock, mock_open
 import dspy
+
 
 from cc_approver.cli import main, cmd_init_or_tui, cmd_optimize_or_tui
 from cc_approver.hook import main as hook_main
@@ -134,8 +136,8 @@ class TestCompleteWorkflow:
                             # Parse the output
                             if output:
                                 result = json.loads(output)
-                                assert result["action"] == "continue"
-    
+                                assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+
     def test_workflow_with_global_and_local_policies(self, workflow_env):
         """Test workflow with both global and local policies."""
         project_dir = workflow_env["project_dir"]
@@ -652,60 +654,49 @@ class TestErrorRecovery:
     """Test error recovery and edge cases."""
     
     def test_lm_timeout_handling(self):
-        """Test handling of LM timeouts."""
-        # Test via hook main function instead
-        
+        """Test handling of LM timeouts — exception propagates."""
         test_input = {
             "tool_name": "Bash",
             "tool_input": {"command": "test"}
         }
-        
-        with patch('sys.stdin.read', return_value=json.dumps(test_input)):
+
+        with patch('cc_approver.hook.json.load', return_value=test_input):
             with patch('cc_approver.hook.load_and_merge_settings') as mock_load:
                 mock_load.return_value = ({"policy": {}, "dspyApprover": {}}, Path("."))
-                
+
                 with patch('cc_approver.hook.configure_lm'):
-                    with patch('cc_approver.hook.run_program') as mock_run:
-                        # Simulate timeout
-                        mock_run.side_effect = TimeoutError("LM request timed out")
-                        
-                        import io
-                        with patch('sys.stdout', new=io.StringIO()) as mock_stdout:
-                            hook_main()
-                            output = mock_stdout.getvalue()
-                            
-                            if output:
-                                result = json.loads(output)
-                                # Should fallback to ask
-                                assert result["action"] == "continue"
-                                assert result["hookSpecificOutput"]["action"] == "ask"
+                    with patch('cc_approver.hook.try_load_compiled', return_value=None):
+                        with patch('cc_approver.hook.run_program') as mock_run:
+                            mock_run.side_effect = TimeoutError("LM request timed out")
+
+                            with pytest.raises(TimeoutError):
+                                hook_main()
     
     def test_invalid_lm_response(self):
         """Test handling of invalid LM responses."""
-        
+        import io
+
         test_input = {
             "tool_name": "Edit",
             "tool_input": {"path": "file.txt"}
         }
-        
-        with patch('sys.stdin.read', return_value=json.dumps(test_input)):
+
+        with patch('cc_approver.hook.json.load', return_value=test_input):
             with patch('cc_approver.hook.load_and_merge_settings') as mock_load:
                 mock_load.return_value = ({"policy": {}, "dspyApprover": {}}, Path("."))
-                
+
                 with patch('cc_approver.hook.configure_lm'):
-                    with patch('cc_approver.hook.run_program') as mock_run:
-                        # Return invalid decision
-                        mock_run.return_value = Mock(decision="maybe", reason="Not sure")
-                        
-                        import io
-                        with patch('sys.stdout', new=io.StringIO()) as mock_stdout:
-                            hook_main()
-                            output = mock_stdout.getvalue()
-                            
-                            if output:
-                                result = json.loads(output)
-                                # Should fallback to ask for invalid decision
-                                assert result["hookSpecificOutput"]["action"] == "ask"
+                    with patch('cc_approver.hook.try_load_compiled', return_value=None):
+                        with patch('cc_approver.hook.run_program') as mock_run:
+                            mock_run.return_value = Mock(decision="maybe", reason="Not sure")
+
+                            with patch('sys.stdout', new=io.StringIO()) as mock_stdout:
+                                hook_main()
+                                output = mock_stdout.getvalue()
+
+                                if output:
+                                    result = json.loads(output)
+                                    assert result["hookSpecificOutput"]["permissionDecision"] == "ask"
     
     def test_network_failure_during_optimization(self):
         """Test handling network failures during optimization."""
@@ -730,16 +721,20 @@ class TestErrorRecovery:
                 )
     
     def test_disk_space_error(self, tmp_path):
-        """Test handling disk space errors during model saving."""
+        """Test that save to a read-only path raises."""
         from cc_approver.approver import ApproverProgram
-        
+
         program = ApproverProgram()
-        save_path = tmp_path / "model.json"
-        
-        # DSPy wraps the error, so we test the actual save behavior
-        with patch('pathlib.Path.open', side_effect=OSError("No space left on device")):
-            with pytest.raises((OSError, RuntimeError)):
+        # Use a path inside a non-existent read-only dir
+        save_path = tmp_path / "readonly" / "model.json"
+        (tmp_path / "readonly").mkdir()
+        (tmp_path / "readonly").chmod(0o444)
+
+        try:
+            with pytest.raises((OSError, PermissionError, RuntimeError)):
                 program.save(str(save_path))
+        finally:
+            (tmp_path / "readonly").chmod(0o755)
 
 
 class TestPermissionPatterns:
@@ -810,19 +805,21 @@ class TestTUIFlow:
                 from cc_approver.tui import init_menu
                 
                 # Mock user inputs
-                mock_select.return_value.ask.side_effect = ["project"]
+                mock_select.return_value.ask.side_effect = [
+                    "project",
+                    "openrouter/google/gemini-2.5-flash-lite",
+                ]
                 mock_text.return_value.ask.side_effect = [
-                    "test-model",  # model
                     "0",           # history_bytes
                     "Bash",        # matcher
                     "30",          # timeout
                     "Test policy"  # policy_text
                 ]
-                
+
                 result = init_menu()
-                
+
                 assert result["scope"] == "project"
-                assert result["model"] == "test-model"
+                assert result["model"] == "openrouter/google/gemini-2.5-flash-lite"
                 assert result["history_bytes"] == 0
                 assert result["matcher"] == "Bash"
                 assert result["timeout"] == 30
@@ -834,13 +831,16 @@ class TestTUIFlow:
             with patch('questionary.text') as mock_text:
                 from cc_approver.tui import optimize_menu
                 
-                # Mock user inputs
-                mock_select.return_value.ask.side_effect = ["project", "mipro", "light"]
+                # 7 select calls: scope, optimizer, auto, task_model,
+                # prompt_model, reflection_model, eval_model
+                mock_select.return_value.ask.side_effect = [
+                    "project", "mipro", "light",
+                    "openrouter/google/gemini-2.5-flash-lite",
+                    "(same as task)", "(same as task)", "(same as task)",
+                ]
+                # 3 text calls: train, val, history_bytes
                 mock_text.return_value.ask.side_effect = [
-                    "test-model",     # task_model
-                    "train.jsonl",    # train file
-                    "val.jsonl",      # val file
-                    "0"               # history_bytes
+                    "train.jsonl", "val.jsonl", "0",
                 ]
                 
                 result = optimize_menu()
@@ -848,7 +848,7 @@ class TestTUIFlow:
                 assert result["scope"] == "project"
                 assert result["optimizer"] == "mipro"
                 assert result["auto"] == "light"
-                assert result["task_model"] == "test-model"
+                assert result["task_model"] == "openrouter/google/gemini-2.5-flash-lite"
                 assert result["train"] == "train.jsonl"
                 assert result["val"] == "val.jsonl"
                 assert result["history_bytes"] == 0

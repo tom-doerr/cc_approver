@@ -34,7 +34,9 @@ def main() -> None:
         print(f"VERBOSE: Policy: {get_merged_policy(settings)[:200]}...", file=sys.stderr)
         print(f"VERBOSE: Model: {cfg['model']}", file=sys.stderr)
 
-    configure_lm(cfg["model"], temperature=DEFAULT_TEMPERATURE, max_tokens=DEFAULT_MAX_TOKENS)
+    extra_body = cfg.get("extraBody")
+    configure_lm(cfg["model"], temperature=DEFAULT_TEMPERATURE,
+                 max_tokens=DEFAULT_MAX_TOKENS, extra_body=extra_body)
     candidates = [cfg["compiledModelPath"],
                   str(Path(proj)/".claude/models/approver.compiled.json"),
                   str(Path.home()/".claude/models/approver.compiled.json")]

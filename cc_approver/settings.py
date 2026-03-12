@@ -95,19 +95,19 @@ def ensure_policy_text(settings: dict, default_text: str = "") -> dict:
     return settings
 
 def ensure_dspy_config(settings: dict, *,
-                       model: str, history_bytes: int,
-                       compiled_path: str, optimizer: str = "mipro",
-                       auto: str = "light",
+                       model: str | None = None, history_bytes: int | None = None,
+                       compiled_path: str | None = None, optimizer: str | None = None,
+                       auto: str | None = None,
                        prompt_model: str | None = None,
                        eval_model: str | None = None,
                        reflection_model: str | None = None):
     cfg = settings.setdefault("dspyApprover", {})
-    # Always update with new values provided
-    cfg["model"] = model
-    cfg["historyBytes"] = history_bytes
-    cfg["compiledModelPath"] = compiled_path
-    cfg["optimizer"] = optimizer
-    cfg["auto"] = auto
+    # Only write fields that were explicitly provided
+    if model is not None: cfg["model"] = model
+    if history_bytes is not None: cfg["historyBytes"] = history_bytes
+    if compiled_path is not None: cfg["compiledModelPath"] = compiled_path
+    if optimizer is not None: cfg["optimizer"] = optimizer
+    if auto is not None: cfg["auto"] = auto
     if prompt_model is not None: cfg["promptModel"] = prompt_model
     if eval_model is not None: cfg["evalModel"] = eval_model
     if reflection_model is not None: cfg["reflectionModel"] = reflection_model
@@ -185,6 +185,7 @@ def get_dspy_config(settings: dict, project_dir: Optional[str] = None) -> dict:
         "promptModel": cfg.get("promptModel"),
         "evalModel": cfg.get("evalModel"),
         "reflectionModel": cfg.get("reflectionModel"),
+        "extraBody": cfg.get("extraBody"),
     }
 
 def write_settings(settings: dict, path: Path) -> None:

@@ -30,10 +30,14 @@ class ApproverProgram(dspy.Module):
                          tool_input_json=tool_input_json,
                          history_tail=history_tail or "")
 
-def configure_lm(model: str, temperature: float = DEFAULT_TEMPERATURE, 
-                 max_tokens: int = DEFAULT_MAX_TOKENS) -> None:
+def configure_lm(model: str, temperature: float = DEFAULT_TEMPERATURE,
+                 max_tokens: int = DEFAULT_MAX_TOKENS,
+                 extra_body: dict | None = None) -> None:
     """Configure global DSPy LM (LiteLLM handles provider keys)."""
-    dspy.configure(lm=dspy.LM(model, temperature=temperature, max_tokens=max_tokens))
+    kwargs = dict(temperature=temperature, max_tokens=max_tokens)
+    if extra_body is not None:
+        kwargs["extra_body"] = extra_body
+    dspy.configure(lm=dspy.LM(model, **kwargs))
 
 
 def try_load_compiled(paths: List[Union[str, Path]]) -> Optional[ApproverProgram]:

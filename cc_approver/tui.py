@@ -18,7 +18,9 @@ def main_menu():
 
 def init_menu():
     scope = q.select("Scope?", choices=["project","global"], default=detect_scope_default()).ask()
-    model = q.select("Task model?", choices=GEMINI_CHOICES, default=GEMINI_CHOICES[0]).ask()
+    model_choices = ["(use global)"] + GEMINI_CHOICES
+    model_raw = q.select("Task model?", choices=model_choices, default="(use global)").ask()
+    model = None if model_raw == "(use global)" else model_raw
     history = q.text("History bytes (0 = disabled):", default="0").ask()
     matcher = q.text("Matcher (regex of tools):", default="Bash|Edit|Write").ask()
     timeout = q.text("Hook timeout (seconds):", default="10").ask()

@@ -1,9 +1,36 @@
+import os
+import sys
 import pytest
 import json
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, MagicMock
 import dspy
+
+# Preserve PYTHONPATH so subprocesses find editable installs
+# even when tests override HOME (which breaks .pth discovery).
+# Resolve actual package source paths from loaded modules.
+_extra_paths = set()
+for _mod in [dspy]:
+    _src = str(Path(_mod.__path__[0]).parent)
+    _extra_paths.add(_src)
+_real_pythonpath = os.pathsep.join(list(_extra_paths) + sys.path)
+
+@pytest.fixture(autouse=True)
+def _preserve_pythonpath():
+    old = os.environ.get("PYTHONPATH")
+    os.environ["PYTHONPATH"] = _real_pythonpath
+    yield
+    if old is None:
+        os.environ.pop("PYTHONPATH", None)
+    else:
+        os.environ["PYTHONPATH"] = old
+
+@pytest.fixture(autouse=True)
+def _reset_dspy():
+    """Reset DSPy global LM between tests."""
+    yield
+    dspy.settings.configure(lm=None)
 
 @pytest.fixture
 def mock_lm():
