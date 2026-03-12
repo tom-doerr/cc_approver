@@ -18,6 +18,7 @@ class Approver(dspy.Signature):
     tool_input_json = dspy.InputField(desc="JSON string of tool parameters")
     history_tail = dspy.InputField(desc="Recent conversation history", optional=True)
     decision = dspy.OutputField(desc="allow|deny|ask - MUST align with policy")
+    reason = dspy.OutputField(desc="Max 10 words: why, and what to do instead if denied")
 
 class ApproverProgram(dspy.Module):
     def __init__(self) -> None:
