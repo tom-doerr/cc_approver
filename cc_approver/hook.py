@@ -32,11 +32,14 @@ def main() -> None:
     if verbose:
         print(f"VERBOSE: Settings loaded from: {settings_path}", file=sys.stderr)
         print(f"VERBOSE: Policy: {get_merged_policy(settings)[:200]}...", file=sys.stderr)
-        print(f"VERBOSE: Model: {cfg['model']}", file=sys.stderr)
+        print(f"VERBOSE: Model: {cfg.get('model') or '(auto-discover)'}", file=sys.stderr)
 
     extra_body = cfg.get("extraBody")
-    configure_lm(cfg["model"], temperature=DEFAULT_TEMPERATURE,
-                 max_tokens=DEFAULT_MAX_TOKENS, extra_body=extra_body)
+    model = cfg.get("model")
+    api_base = cfg.get("apiBase")
+    api_key = cfg.get("apiKey")
+    configure_lm(model, extra_body=extra_body,
+                 api_base=api_base, api_key=api_key)
     candidates = [cfg["compiledModelPath"],
                   str(Path(proj)/".claude/models/approver.compiled.json"),
                   str(Path.home()/".claude/models/approver.compiled.json")]
@@ -44,7 +47,17 @@ def main() -> None:
 
     policy = get_merged_policy(settings)
     history = tail(tpath, cfg["historyBytes"])
-    res = run_program(program, policy, tool, tinput, history)
+    try:
+        res = run_program(program, policy, tool, tinput, history)
+    except Exception as e:
+        if not api_base or model:
+            raise
+        from .discovery import refresh_model
+        logger.info(f"Retrying with refreshed model: {e}")
+        new_model = "openai/" + refresh_model(api_base)
+        configure_lm(new_model, extra_body=extra_body,
+                     api_base=api_base, api_key=api_key)
+        res = run_program(program, policy, tool, tinput, history)
 
     decision = normalize_decision(res.decision)
     reason = truncate_reason(getattr(res, "reason", ""))

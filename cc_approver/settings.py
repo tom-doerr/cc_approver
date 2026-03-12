@@ -174,7 +174,8 @@ def _resolve(s: str, project_dir: Optional[str]) -> str:
 
 def get_dspy_config(settings: dict, project_dir: Optional[str] = None) -> dict:
     cfg = settings.get("dspyApprover") or {}
-    model = cfg.get("model") or DEFAULT_MODEL
+    api_base = cfg.get("apiBase")
+    model = cfg.get("model") or (None if api_base else DEFAULT_MODEL)
     hbytes = int(cfg.get("historyBytes") or DEFAULT_HISTORY_BYTES)
     cmp_raw = cfg.get("compiledModelPath") or DEFAULT_COMPILED_PATH
     compiled = _resolve(cmp_raw, project_dir)
@@ -186,6 +187,8 @@ def get_dspy_config(settings: dict, project_dir: Optional[str] = None) -> dict:
         "evalModel": cfg.get("evalModel"),
         "reflectionModel": cfg.get("reflectionModel"),
         "extraBody": cfg.get("extraBody"),
+        "apiBase": cfg.get("apiBase"),
+        "apiKey": cfg.get("apiKey"),
     }
 
 def write_settings(settings: dict, path: Path) -> None:

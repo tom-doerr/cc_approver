@@ -3,7 +3,7 @@ import json, logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 import dspy
-from .constants import DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, DEFAULT_PRIORITY
+from .constants import DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, DEFAULT_PRIORITY, DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +30,24 @@ class ApproverProgram(dspy.Module):
                          tool_input_json=tool_input_json,
                          history_tail=history_tail or "")
 
-def configure_lm(model: str, temperature: float = DEFAULT_TEMPERATURE,
-                 max_tokens: int = DEFAULT_MAX_TOKENS,
-                 extra_body: dict | None = None) -> None:
-    """Configure global DSPy LM (LiteLLM handles provider keys)."""
+def configure_lm(model: str | None = None, temperature: float = DEFAULT_TEMPERATURE,
+                 max_tokens: int = DEFAULT_MAX_TOKENS, extra_body: dict | None = None,
+                 api_base: str | None = None, api_key: str | None = None) -> None:
+    """Configure global DSPy LM. Auto-discovers model from api_base if needed."""
+    if model is None and api_base:
+        from .discovery import discover_model
+        model = "openai/" + discover_model(api_base)
+    elif model is None:
+        model = DEFAULT_MODEL
     kwargs = dict(temperature=temperature, max_tokens=max_tokens)
     body = {"priority": DEFAULT_PRIORITY}
     if extra_body is not None:
         body.update(extra_body)
     kwargs["extra_body"] = body
+    if api_base:
+        kwargs["api_base"] = api_base
+    if api_key:
+        kwargs["api_key"] = api_key
     dspy.configure(lm=dspy.LM(model, **kwargs))
 
 
