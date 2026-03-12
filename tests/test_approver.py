@@ -49,7 +49,7 @@ class TestConfigureLM:
     def test_configure_lm_default(self, mock_lm, mock_configure):
         """Test configure_lm with default parameters."""
         configure_lm("test-model")
-        mock_lm.assert_called_once_with("test-model", temperature=0.0, max_tokens=1024)
+        mock_lm.assert_called_once_with("test-model", temperature=0.0, max_tokens=1024, extra_body={"priority": -1})
         mock_configure.assert_called_once()
 
 class TestTryLoadCompiled:

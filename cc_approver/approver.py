@@ -3,7 +3,7 @@ import json, logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 import dspy
-from .constants import DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS
+from .constants import DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, DEFAULT_PRIORITY
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,10 @@ def configure_lm(model: str, temperature: float = DEFAULT_TEMPERATURE,
                  extra_body: dict | None = None) -> None:
     """Configure global DSPy LM (LiteLLM handles provider keys)."""
     kwargs = dict(temperature=temperature, max_tokens=max_tokens)
+    body = {"priority": DEFAULT_PRIORITY}
     if extra_body is not None:
-        kwargs["extra_body"] = extra_body
+        body.update(extra_body)
+    kwargs["extra_body"] = body
     dspy.configure(lm=dspy.LM(model, **kwargs))
 
 

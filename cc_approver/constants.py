@@ -10,6 +10,7 @@ DEFAULT_MODEL = "openrouter/google/gemini-2.5-flash-lite"
 # Hook Configuration Constants
 DEFAULT_MATCHER = "Bash|Edit|Write"
 DEFAULT_TIMEOUT = 60
+DEFAULT_PRIORITY = -1
 MAX_REASON_LENGTH = 500
 DEFAULT_HISTORY_BYTES = 0
 
